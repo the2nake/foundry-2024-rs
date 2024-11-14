@@ -5,7 +5,9 @@
 extern crate alloc;
 
 mod actuator;
+mod control;
 mod localization;
+mod logic;
 mod tank_chassis;
 mod utils;
 
@@ -17,10 +19,13 @@ use vexide::{
     prelude::*,
 };
 
-use crate::{actuator::MotorGroup, tank_chassis::TankChassis};
+use crate::{
+    actuator::MotorGroup,
+    tank_chassis::{SimpleController, TankChassis},
+};
 struct Robot {
     controller: Controller,
-    chassis: TankChassis,
+    chassis: TankChassis<SimpleController>,
 }
 
 impl Compete for Robot {
@@ -33,13 +38,9 @@ impl Compete for Robot {
         loop {
             let start = Instant::now();
 
-            let state = match self.controller.state() {
-                Ok(state) => Some(state),
-                Err(_) => None,
-            };
-
-            let left = state.map_or(0.0, |x| x.left_stick.y());
-            let right = state.map_or(0.0, |x| x.right_stick.y());
+            let state = self.controller.state().unwrap_or_default();
+            let left = state.left_stick.y();
+            let right = state.right_stick.y();
             self.chassis.tank(left, right).await;
 
             sleep_until(
@@ -63,6 +64,8 @@ async fn main(peripherals: Peripherals) {
     let chassis = TankChassis::new(
         Arc::new(Mutex::new(MotorGroup::new(vec![l1, l2, l3]))),
         Arc::new(Mutex::new(MotorGroup::new(vec![r1, r2, r3]))),
+        SimpleController {},
+        SimpleController {},
     );
 
     let robot = Robot {
