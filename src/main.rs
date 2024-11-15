@@ -25,7 +25,7 @@ use crate::{
 };
 struct Robot {
     controller: Controller,
-    chassis: TankChassis<SimpleController>,
+    chassis: TankChassis,
 }
 
 impl Compete for Robot {
@@ -64,8 +64,6 @@ async fn main(peripherals: Peripherals) {
     let chassis = TankChassis::new(
         Arc::new(Mutex::new(MotorGroup::new(vec![l1, l2, l3]))),
         Arc::new(Mutex::new(MotorGroup::new(vec![r1, r2, r3]))),
-        SimpleController {},
-        SimpleController {},
     );
 
     let robot = Robot {

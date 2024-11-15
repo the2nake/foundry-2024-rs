@@ -1,52 +1,55 @@
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, sync::Arc};
 
 use vexide::core::sync::Mutex;
 
 use crate::{actuator::MotorGroup, logic::State};
-pub struct TankChassis<T: State<f64, f64>> {
+pub struct TankChassis {
     left: Arc<Mutex<MotorGroup>>,
     right: Arc<Mutex<MotorGroup>>,
-    left_controller: T,  // takes a percentage, returns a voltage
-    right_controller: T, // takes a percentage, returns a voltage
+    left_ctrl: Box<dyn State<f64, f64>>, // takes ang vel, returns a voltage
+    right_ctrl: Box<dyn State<f64, f64>>, // takes ang vel, returns a voltage
 }
 
-impl<T: State<f64, f64>> TankChassis<T> {
-    pub fn new(
-        left: Arc<Mutex<MotorGroup>>,
-        right: Arc<Mutex<MotorGroup>>,
-        left_controller: T,
-        right_controller: T,
-    ) -> Self {
+impl TankChassis {
+    pub fn new(left: Arc<Mutex<MotorGroup>>, right: Arc<Mutex<MotorGroup>>) -> Self {
         TankChassis {
             left,
             right,
-            left_controller,
-            right_controller,
+            left_ctrl: Box::new(SimpleController {}),
+            right_ctrl: Box::new(SimpleController {}),
         }
     }
 
     pub async fn arcade(&mut self, throttle: f64, turn: f64) {
-        let left_target = throttle - turn;
-        let right_target = throttle + turn;
-        self.left
-            .lock()
-            .await
-            .set_voltage(self.left_controller.get(&left_target));
-        self.right
-            .lock()
-            .await
-            .set_voltage(self.right_controller.get(&right_target));
+        self.set_left(throttle - turn).await;
+        self.set_right(throttle + turn).await;
     }
 
     pub async fn tank(&mut self, left: f64, right: f64) {
+        self.set_left(left).await;
+        self.set_right(right).await;
+    }
+
+    async fn set_left(&mut self, target: f64) {
         self.left
             .lock()
             .await
-            .set_voltage(self.left_controller.get(&left));
+            .set_voltage(self.left_ctrl.get(&target));
+    }
+
+    async fn set_right(&mut self, target: f64) {
         self.right
             .lock()
             .await
-            .set_voltage(self.right_controller.get(&right));
+            .set_voltage(self.right_ctrl.get(&target));
+    }
+
+    fn left_use(&mut self, ctrl: Box<dyn State<f64, f64>>) {
+        self.left_ctrl = ctrl;
+    }
+
+    fn right_use(&mut self, ctrl: Box<dyn State<f64, f64>>) {
+        self.right_ctrl = ctrl;
     }
 }
 
